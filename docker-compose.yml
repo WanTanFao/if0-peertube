@@ -1,0 +1,71 @@
+version: "3.3"
+
+services:
+  peertube:
+    image: chocobozzz/peertube:production-stretch
+    networks:
+      - peertube
+      - traefik-public
+    labels:
+      traefik.enable: "true"
+      traefik.frontend.rule: "Host:${PEERTUBE_WEBSERVER_HOSTNAME}"
+      traefik.port: "9000"
+      traefik.tags: traefik-public
+      traefik.docker.network: traefik-public
+      traefik.redirectorservice.frontend.entryPoints: http
+      traefik.redirectorservice.frontend.redirect.entryPoint: https
+      traefik.webservice.frontend.entryPoints: https
+    volumes:
+      - peertube-data:/data
+      - peertube-config:/config
+    depends_on:
+      - postgres
+      - redis
+      - postfix
+    restart: "always"
+
+  postgres:
+    image: postgres:10-alpine
+    environment:
+      POSTGRES_USER: ${PEERTUBE_DB_USERNAME}
+      POSTGRES_PASSWORD: ${PEERTUBE_DB_PASSWORD}
+      POSTGRES_DB: peertube
+    networks:
+      - peertube
+    volumes:
+      - peertube-db:/var/lib/postgresql/data
+    restart: "always"
+    labels:
+      traefik.enable: "false"
+
+  redis:
+    image: redis:4-alpine
+    networks:
+      - peertube
+    volumes:
+      - peertube-redis:/data
+    restart: "always"
+    labels:
+      traefik.enable: "false"
+
+  postfix:
+    networks:
+      - peertube
+    image: mwader/postfix-relay
+    environment:
+      - POSTFIX_myhostname=${PEERTUBE_WEBSERVER_HOSTNAME}
+    labels:
+      traefik.enable: "false"
+    restart: "always"
+  
+volumes:
+  peertube-data:
+  peertube-config:
+  peertube-db:
+  peertube-redis:
+
+networks:
+  traefik-public:
+    external: true
+  peertube:
+    internal: true
